@@ -1,0 +1,43 @@
+FROM node:16-alpine AS build
+
+WORKDIR /app
+
+# 复制应用程序文件
+COPY package*.json ./
+RUN npm install
+COPY . .
+
+# 下载健康检查工具（根据容器架构自动选择适当的版本）
+RUN apk add --no-cache curl \
+    && ARCH=$(uname -m) \
+    && if [ "$ARCH" = "x86_64" ]; then \
+         BINARY_NAME="healthcheck-amd64"; \
+       elif [ "$ARCH" = "aarch64" ]; then \
+         BINARY_NAME="healthcheck-arm64"; \
+       else \
+         echo "不支持的架构: $ARCH" && exit 1; \
+       fi \
+    && curl -L "https://github.com/gptq/healthcheck/releases/latest/download/$BINARY_NAME" -o /tmp/healthcheck \
+    && chmod +x /tmp/healthcheck
+
+# 创建最终镜像
+FROM node:16-alpine
+
+WORKDIR /app
+
+# 从构建阶段复制应用程序文件和健康检查工具
+COPY --from=build /app /app
+COPY --from=build /tmp/healthcheck /usr/local/bin/healthcheck
+
+# 配置应用服务
+EXPOSE 3000
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV API_PATH=health
+
+# 配置健康检查
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["healthcheck", "3000", "health"]
+
+# 启动应用
+CMD ["npm", "start"]

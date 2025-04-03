@@ -1,0 +1,42 @@
+FROM python:3.9-slim AS build
+
+WORKDIR /app
+
+# 复制应用程序文件
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+# 下载健康检查工具（根据容器架构自动选择适当的版本）
+RUN apt-get update && apt-get install -y curl \
+    && ARCH=$(uname -m) \
+    && if [ "$ARCH" = "x86_64" ]; then \
+         BINARY_NAME="healthcheck-amd64"; \
+       elif [ "$ARCH" = "aarch64" ]; then \
+         BINARY_NAME="healthcheck-arm64"; \
+       else \
+         echo "不支持的架构: $ARCH" && exit 1; \
+       fi \
+    && curl -L "https://github.com/gptq/healthcheck/releases/latest/download/$BINARY_NAME" -o /tmp/healthcheck \
+    && chmod +x /tmp/healthcheck
+
+# 创建最终镜像
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# 从构建阶段复制应用程序文件和健康检查工具
+COPY --from=build /app /app
+COPY --from=build /tmp/healthcheck /usr/local/bin/healthcheck
+
+# 配置应用服务
+EXPOSE 5000
+ENV PORT=5000
+ENV API_PATH=api/health
+
+# 配置健康检查
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD ["healthcheck", "5000", "api/health"]
+
+# 启动应用
+CMD ["python", "app.py"]

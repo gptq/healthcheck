@@ -1,0 +1,49 @@
+FROM rust:1.68 as build
+
+WORKDIR /usr/src/app
+
+# 复制项目文件
+COPY Cargo.toml Cargo.lock ./
+# 创建空的src/main.rs以便缓存依赖
+RUN mkdir -p src && \
+    echo "fn main() {println!(\"placeholder\");}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# 复制实际的代码并重新构建
+COPY . .
+RUN cargo build --release
+
+# 下载健康检查工具（根据容器架构自动选择适当的版本）
+RUN apt-get update && apt-get install -y curl \
+    && ARCH=$(uname -m) \
+    && if [ "$ARCH" = "x86_64" ]; then \
+         BINARY_NAME="healthcheck-amd64"; \
+       elif [ "$ARCH" = "aarch64" ]; then \
+         BINARY_NAME="healthcheck-arm64"; \
+       else \
+         echo "不支持的架构: $ARCH" && exit 1; \
+       fi \
+    && curl -L "https://github.com/gptq/healthcheck/releases/latest/download/$BINARY_NAME" -o /tmp/healthcheck \
+    && chmod +x /tmp/healthcheck
+
+# 创建最终镜像
+FROM debian:bullseye-slim
+
+WORKDIR /app
+
+# 从构建阶段复制二进制文件
+COPY --from=build /usr/src/app/target/release/my_app .
+COPY --from=build /tmp/healthcheck /usr/local/bin/healthcheck
+
+# 配置应用服务
+EXPOSE 8000
+ENV PORT=8000
+ENV API_PATH=api/health
+
+# 配置健康检查
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD ["healthcheck", "8000", "api/health"]
+
+# 启动应用
+CMD ["./my_app"]
