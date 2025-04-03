@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>  // 用于字符检查
 #include <errno.h>  // 用于错误处理
+#include <stdint.h> // 用于uint16_t等类型定义
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -11,7 +12,7 @@
     #pragma comment(lib, "ws2_32.lib")
     // Windows不支持getenv，需要使用Windows特定的函数
     #define close(s) closesocket(s)
-    typedef int ssize_t;
+    // 不再定义ssize_t，因为MinGW已经定义
 #else
     #include <unistd.h>
     #include <sys/socket.h>
