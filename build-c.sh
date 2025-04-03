@@ -13,6 +13,23 @@ gcc -static -o ./bin/healthcheck-amd64 healthcheck.c
 echo "编译 linux/arm64 版本..."
 aarch64-linux-gnu-gcc -static -o ./bin/healthcheck-arm64 healthcheck.c
 
+# 检查是否有MinGW交叉编译工具用于Windows
+if command -v x86_64-w64-mingw32-gcc &> /dev/null; then
+    echo "编译 windows/amd64 版本..."
+    x86_64-w64-mingw32-gcc -o ./bin/healthcheck-windows-amd64.exe healthcheck.c -lws2_32
+    
+    # 添加可执行权限
+    chmod +x ./bin/healthcheck-windows-amd64.exe
+    
+    # 检查编译后的Windows二进制文件
+    echo "Windows AMD64版本文件类型:"
+    file ./bin/healthcheck-windows-amd64.exe
+else
+    echo "警告: 未找到MinGW交叉编译工具，跳过Windows版本编译"
+    echo "可以通过安装 mingw-w64 来启用Windows构建:"
+    echo "sudo apt-get install -y mingw-w64"
+fi
+
 # 添加可执行权限
 chmod +x ./bin/healthcheck-amd64 ./bin/healthcheck-arm64
 
@@ -50,3 +67,6 @@ echo ""
 echo "编译完成！"
 echo "AMD64版本: ./bin/healthcheck-amd64"
 echo "ARM64版本: ./bin/healthcheck-arm64"
+if command -v x86_64-w64-mingw32-gcc &> /dev/null; then
+    echo "Windows AMD64版本: ./bin/healthcheck-windows-amd64.exe"
+fi

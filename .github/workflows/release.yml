@@ -33,16 +33,19 @@ jobs:
       - name: 安装跨平台编译工具
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu mingw-w64
 
-      - name: 编译 AMD64 版本
+      - name: 编译 AMD64 版本 (Linux)
         run: gcc -static -o healthcheck-amd64 healthcheck.c
       
-      - name: 编译 ARM64 版本
+      - name: 编译 ARM64 版本 (Linux)
         run: aarch64-linux-gnu-gcc -static -o healthcheck-arm64 healthcheck.c
+        
+      - name: 编译 AMD64 版本 (Windows)
+        run: x86_64-w64-mingw32-gcc -o healthcheck-windows-amd64.exe healthcheck.c -lws2_32
       
       - name: 添加可执行权限
-        run: chmod +x healthcheck-amd64 healthcheck-arm64
+        run: chmod +x healthcheck-amd64 healthcheck-arm64 healthcheck-windows-amd64.exe
       
       - name: 创建标签
         run: |
@@ -60,6 +63,7 @@ jobs:
           files: |
             healthcheck-amd64
             healthcheck-arm64
+            healthcheck-windows-amd64.exe
           draft: false
           prerelease: false
         env:

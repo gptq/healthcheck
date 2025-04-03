@@ -1,12 +1,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <ctype.h>  // 用于字符检查
 #include <errno.h>  // 用于错误处理
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <windows.h>
+    #pragma comment(lib, "ws2_32.lib")
+    // Windows不支持getenv，需要使用Windows特定的函数
+    #define close(s) closesocket(s)
+    typedef int ssize_t;
+#else
+    #include <unistd.h>
+    #include <sys/socket.h>
+    #include <arpa/inet.h>
+    #include <netinet/in.h>
+#endif
 
 #define BUFFER_SIZE 4096
 #define MAX_PATH_LENGTH 100
@@ -139,6 +150,17 @@ int main(int argc, char *argv[]) {
     int debug = 0;
     int result = 1; // 默认失败
     
+#ifdef _WIN32
+    // 初始化Winsock
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        if (debug) {
+            printf("WSAStartup失败\n");
+        }
+        return 1;
+    }
+#endif
+
     // 解析命令行参数
     if (argc > 1) {
         port = argv[1];
@@ -294,5 +316,11 @@ int main(int argc, char *argv[]) {
     
     // 关闭套接字
     close(sock);
+    
+#ifdef _WIN32
+    // 清理Winsock
+    WSACleanup();
+#endif
+
     return result;
 }
