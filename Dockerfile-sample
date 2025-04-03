@@ -1,18 +1,18 @@
-FROM rust:1.81-slim AS builder
+FROM alpine:latest
 
-WORKDIR /usr/src/app
+# 复制您的应用程序
+COPY ./your_app /app/your_app
 
-# 下载健康检查工具并设置执行权限
-RUN apt-get update && apt-get install -y wget && \
-    wget -O /usr/src/app/api-server/healthcheck https://github.com/gptq/healthcheck/raw/refs/heads/main/bin/healthcheck-amd64 && \
-    chmod +x /usr/src/app/api-server/healthcheck
-
-# 使用Google distroless(noroot)版本作为最终镜像
-FROM gcr.io/distroless/cc-debian12:nonroot
+# 复制健康检查工具到容器中
+COPY ./bin/healthcheck-amd64 /app/healthcheck
 
 WORKDIR /app
+EXPOSE 8080
 
-# 复制编译好的二进制文件
-COPY --from=builder /usr/src/app/api-server/target/release/aho-corasick-api /app/
-# 复制健康检查工具
-COPY --from=builder /usr/src/app/api-server/healthcheck /app/healthcheck
+# 设置健康检查配置
+ENV PORT=8080
+ENV API_PATH=api/health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD ["/app/healthcheck"]
+
+CMD ["./your_app"]

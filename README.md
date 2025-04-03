@@ -41,25 +41,39 @@ DEBUG=1 ./healthcheck-amd64 8080 api/health
 
 ### 在Docker中使用
 
-在Dockerfile中：
+#### 示例Dockerfile
 
-```Dockerfile
+```dockerfile
+FROM alpine:latest
+
+# 复制你的应用程序
+COPY ./your_app /app/your_app
+
 # 复制健康检查工具到容器中
-COPY --from=health-check-image --chown=nonroot:nonroot /bin/healthcheck-amd64 /app/healthcheck
+COPY ./bin/healthcheck-amd64 /app/healthcheck
+
+WORKDIR /app
+EXPOSE 8080
 
 # 设置健康检查配置
 ENV PORT=8080
 ENV API_PATH=api/health
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD ["/app/healthcheck"]
+
+CMD ["./your_app"]
 ```
 
-在docker-compose.yml中：
+#### 示例docker-compose.yml
 
 ```yaml
+version: '3'
+
 services:
-  your-service:
+  web:
     build: .
+    ports:
+      - "8080:8080"
     healthcheck:
       test: ["CMD", "/app/healthcheck", "8080", "api/health"]
       interval: 30s
@@ -72,6 +86,14 @@ services:
 
 - `0`：健康检查成功（HTTP状态码2xx）
 - `1`：健康检查失败（连接失败或HTTP状态码非2xx）
+
+## 输入验证
+
+工具会验证提供的端口和路径参数：
+
+- 端口必须是1-65535之间的数字
+- 路径只能包含字母、数字、斜杠(/)、连字符(-)和下划线(_)
+- 路径长度限制在100个字符以内
 
 ## 编译
 
@@ -86,43 +108,8 @@ chmod +x build-c.sh
 - AMD64版本：`./bin/healthcheck-amd64`
 - ARM64版本：`./bin/healthcheck-arm64`
 
-# Health Check
+## 最佳实践
 
-A minimal health check. Calls the defined API and exits either with 0 (success) or 1 (failure).
-
-## Usage
-
-Example `Dockerfile` file
-
-```Dockerfile
-FROM rust:1.68 as builder
-
-# Make use of cache for dependencies.
-RUN USER=root cargo new --bin your_app
-WORKDIR ./your_app
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./Cargo.toml ./Cargo.toml
-RUN cargo build --release && \
-    rm src/*.rs
-
-# Build the app.
-COPY . ./
-RUN rm ./target/release/deps/your_app*
-RUN cargo build --release
-
-# Use distroless as minimal base image to package the app.
-FROM gcr.io/distroless/cc-debian11:nonroot
-
-COPY --from=builder --chown=nonroot:nonroot /your_app/target/release/your_app /app/your_app
-COPY --from=samuelba/healthcheck:latest --chown=nonroot:nonroot /app/healthcheck /app/healthcheck
-USER nonroot
-WORKDIR /app
-EXPOSE 9000
-
-# Define the port and API path for the healthcheck.
-# The health check will call http://localhost:PORT/API_PATH.
-ENV PORT=9000
-ENV API_PATH=api/v1/health
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD ["/app/healthcheck"]
-
-CMD ["./your_app"]
+- 在非调试模式下（不设置DEBUG环境变量），健康检查工具不会输出任何内容，只通过退出码表明健康状态
+- 在Docker容器中，确保将健康检查工具复制到容器内
+- 如果遇到问题，可以临时启用DEBUG模式进行故障排查
