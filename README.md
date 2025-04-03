@@ -1,8 +1,3 @@
-![GitHub](https://img.shields.io/github/license/samuelba/healthcheck)
-[![ci](https://github.com/samuelba/healthcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/samuelba/healthcheck/actions/workflows/ci.yml)
-![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/samuelba/healthcheck)
-![Docker Image Size (latest semver)](https://img.shields.io/docker/image-size/samuelba/healthcheck)
-
 # 健康检查工具
 
 这是一个轻量级的HTTP健康检查工具，用于Docker容器健康状态监控。该工具会发送HTTP请求到指定的端点，并根据HTTP状态码判断服务是否健康。
