@@ -1,0 +1,66 @@
+name: 发布二进制文件
+
+on:
+  push:
+    branches:
+      - main  # 当推送到main分支时触发
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    name: 构建二进制文件
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 获取完整的历史记录用于版本计算
+
+      - name: 自动生成版本号
+        id: version
+        run: |
+          # 获取简短的提交哈希
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          # 获取当前日期，格式为YYYYMMDD
+          DATE=$(date '+%Y%m%d')
+          # 获取当天在main分支的提交计数
+          COUNT=$(git rev-list --count --since="midnight" main)
+          # 组合版本号：日期.计数.哈希
+          VERSION="v${DATE}.${COUNT}.${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "生成的版本号: ${VERSION}"
+
+      - name: 安装跨平台编译工具
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: 编译 AMD64 版本
+        run: gcc -static -o healthcheck-amd64 healthcheck.c
+      
+      - name: 编译 ARM64 版本
+        run: aarch64-linux-gnu-gcc -static -o healthcheck-arm64 healthcheck.c
+      
+      - name: 添加可执行权限
+        run: chmod +x healthcheck-amd64 healthcheck-arm64
+      
+      - name: 创建标签
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag ${{ steps.version.outputs.version }}
+          git push origin ${{ steps.version.outputs.version }}
+      
+      - name: 创建发布
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          files: |
+            healthcheck-amd64
+            healthcheck-arm64
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
